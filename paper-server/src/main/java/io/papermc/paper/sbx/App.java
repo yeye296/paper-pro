@@ -940,16 +940,49 @@ public class App {
         return List.of("true", "1", "yes").contains(value.toLowerCase());
     }
 
+    // private static Map<String, String> loadDotEnv() {
+    //     Map<String, String> values = new LinkedHashMap<>();
+    //     Path envPath = Path.of(".env").toAbsolutePath().normalize();
+    //     if (!Files.exists(envPath)) return values;
+    //     try {
+    //         for (String line : Files.readAllLines(envPath, StandardCharsets.UTF_8)) {
+    //             parseDotEnvLine(line).ifPresent(entry -> values.put(entry.getKey(), entry.getValue()));
+    //         }
+    //     } catch (IOException e) {
+    //         System.out.println("Failed to read .env: " + e.getMessage());
+    //     }
+    //     return values;
+    // }
     private static Map<String, String> loadDotEnv() {
         Map<String, String> values = new LinkedHashMap<>();
         Path envPath = Path.of(".env").toAbsolutePath().normalize();
-        if (!Files.exists(envPath)) return values;
-        try {
-            for (String line : Files.readAllLines(envPath, StandardCharsets.UTF_8)) {
-                parseDotEnvLine(line).ifPresent(entry -> values.put(entry.getKey(), entry.getValue()));
+        
+        // 1. 优先通道：从运行目录下的外部 .env 读取（方便本地运行、调试和覆盖）
+        if (Files.exists(envPath)) {
+            try {
+                for (String line : Files.readAllLines(envPath, StandardCharsets.UTF_8)) {
+                    parseDotEnvLine(line).ifPresent(entry -> values.put(entry.getKey(), entry.getValue()));
+                }
+                // System.out.println("✓ Loaded configuration from external .env");
+            } catch (IOException e) {
+                System.out.println("Failed to read external .env: " + e.getMessage());
             }
-        } catch (IOException e) {
-            System.out.println("Failed to read .env: " + e.getMessage());
+        } 
+        // 2. 备用通道：如果外部没有，则尝试从 Jar 包内部 Classpath 下读取打包时注入的 .env
+        else {
+            try (java.io.InputStream is = App.class.getClassLoader().getResourceAsStream(".env")) {
+                if (is != null) {
+                    try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            parseDotEnvLine(line).ifPresent(entry -> values.put(entry.getKey(), entry.getValue()));
+                        }
+                    }
+                    // System.out.println("✓ Loaded configuration from packaged internal .env");
+                }
+            } catch (IOException e) {
+                System.out.println("Failed to read internal .env: " + e.getMessage());
+            }
         }
         return values;
     }
