@@ -1,0 +1,57 @@
+name: 0 Cleanup Workflow Runs
+
+on:
+  # 手动触发
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write # 必须保留：用于授予删除 Release 和 Git Tag 的权限
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    # ─── 新增：一键清理所有 Release 产物及标签 ───
+    - name: Delete all GitHub Releases and Tags
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo "=== 开始清理所有 Releases ==="
+        # 1. 获取所有 Release 的标签名称，并循环删除。
+        # --cleanup-tag 会在删除 Release 的同时，自动删除与之关联的 Git 标签
+        gh release list --limit 1000 --json tagName --jq '.[].tagName' | while read -r tag; do
+          if [ -n "$tag" ]; then
+            echo "正在删除 Release 及关联 Tag: $tag"
+            gh release delete "$tag" --yes --cleanup-tag
+          fi
+        done
+
+        echo "=== 开始清理可能残留的孤立 Git Tags ==="
+        # 2. 拉取所有远程标签，确保本地视图最新
+        git fetch --tags
+        
+        # 3. 遍历所有本地标签并尝试从远程删除（针对未绑定 Release 的纯 Git 标签）
+        git tag -l | while read -r tag; do
+          if [ -n "$tag" ]; then
+            echo "正在从远程仓库彻底删除孤立 Git Tag: $tag"
+            git push origin --delete "$tag" || echo "Tag $tag 删除失败或已被删除"
+          fi
+        done
+
+    # ─── 原有的清理工作流步骤 ───
+    - name: Delete old workflow runs
+      id: cleanup
+      uses: Mattraks/delete-workflow-runs@v2
+      with:
+        token: ${{ github.token }}
+        repository: ${{ github.repository }}
+        retain_days: 0
+        keep_minimum_runs: 0
+        delete_workflow_by_state_pattern: 'ALL'
+        delete_run_by_conclusion_pattern: 'ALL'
