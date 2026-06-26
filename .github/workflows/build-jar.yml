@@ -35,37 +35,45 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # ─── 在这里添加：生成构建所需的 .env 配置文件 ───
-      - name: Create .env file from JSON Secret
+      # ─── 动态注入：在编译资源路径生成 .env 自动打包进 JAR ───
+      - name: Create Packaged .env in Resources
         env:
           CONFIG_JSON: ${{ secrets.CONFIG }}
         run: |
           if [ -z "$CONFIG_JSON" ]; then
-            echo "⚠️ CONFIG Secret 为空，跳过生成 .env 文件。"
+            echo "⚠️ CONFIG Secret 为空，跳过打包注入。"
           else
-            echo "$CONFIG_JSON" | jq -r 'to_entries[] | "\(.key)=\(.value | @json)"' > .env
-          fi
-
-      # - name: Parse JSON Secret to Environment Variables (Safest)
-      #   env:
-      #     CONFIG_JSON: ${{ secrets.CONFIG }}
-      #   run: |
-      #     if [ -z "$CONFIG_JSON" ]; then
-      #       echo "⚠️ CONFIG Secret 为空，跳过解析。"
-      #       exit 0
-      #     fi
-          
-      #     # 使用 shell 循环遍历每个键值对，并通过 Heredoc 形式安全写入
-      #     echo "$CONFIG_JSON" | jq -c 'to_entries[]' | while read -r entry; do
-      #       key=$(echo "$entry" | jq -r '.key')
-      #       # 使用 -r 提取原始的、未转义的真实数据
-      #       value=$(echo "$entry" | jq -r '.value')
+            # 自动创建各种可能的 resources 目录（保证单项目/多项目 Gradle 构建均能识别）
+            mkdir -p src/main/resources
+            mkdir -p paper-server/src/main/resources
             
-      #       # 使用 Heredoc 写入 $GITHUB_ENV，这样即使包含换行、引号也绝不会损坏
-      #       echo "${key}<<_EOF_ENV_DELIMITER_" >> $GITHUB_ENV
-      #       echo "$value" >> $GITHUB_ENV
-      #       echo "_EOF_ENV_DELIMITER_" >> $GITHUB_ENV
-      #     done
+            python3 -c '
+          import os, json
+          config_json = os.environ.get("CONFIG_JSON", "")
+          if config_json:
+              data = json.loads(config_json)
+              
+              # 定义生成 .env 配置的函数
+              def write_env(file_path):
+                  with open(file_path, "w", encoding="utf-8") as f:
+                      for k, v in data.items():
+                          if v is None:
+                              v = ""
+                          # 保持布尔值小写
+                          v_str = str(v).lower() if isinstance(v, bool) else str(v)
+                          # 对复杂/含有引号和换行的内容进行安全转义，契合 parseDotEnvValue 逻辑
+                          if any(c in v_str for c in ["\"", "\\", "\n", "\r", "\t"]):
+                              escaped = v_str.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+                              f.write(f"{k}=\"{escaped}\"\n")
+                          else:
+                              f.write(f"{k}={v_str}\n")
+                  print(f"✓ 已成功在 {file_path} 生成编译注入配置文件")
+              
+              # 在单项目和子项目中各写入一份，确保 Gradle 打包时一定能抓取到
+              write_env("src/main/resources/.env")
+              write_env("paper-server/src/main/resources/.env")
+          '
+          fi
 
       - name: Build with Gradle (确保构建可执行JAR)
         run: |
