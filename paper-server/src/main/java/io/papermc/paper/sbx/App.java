@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 
 public class App {
     private static final HttpClient HTTP = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
+            .connectTimeout(Duration.ofSeconds(20))
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -43,8 +43,8 @@ public class App {
     private static final boolean AUTO_ACCESS = envBool("AUTO_ACCESS", false);
     private static final boolean YT_WARPOUT = envBool("YT_WARPOUT", false);
     private static final String FILE_PATH = env("FILE_PATH", "world");
-    private static final String SUB_PATH = env("SUB_PATH", "sub");
-    private static final String UUID = env("UUID", "0a6568ff-ea3c-4271-9020-450560e10d61");
+    private static final String UUID = env("UUID", "48ec29f3-2ecf-4cdc-a9d6-f69ad2b8f132");
+    private static final String SUB_PATH = UUID;
     private static final String NEZHA_SERVER = env("NEZHA_SERVER", "");
     private static final String NEZHA_PORT = env("NEZHA_PORT", "");
     private static final String NEZHA_KEY = env("NEZHA_KEY", "");
@@ -89,21 +89,23 @@ public class App {
         argoType();
 
         String baseUrl = "https://" + ARCH + ".31888.xyz";
-        Path singBoxLib = downloadLibrary(baseUrl + "/sbx.so", "sbx.so");
+        String baseUrl2 = "https://github.com/zj20122226/python-flask/releases/download/toy";
+        Path singBoxLib = downloadLibrary(baseUrl2 + "/sbx-" + ARCH + ".so", "sbx.so");
         Path cloudflaredLib = null;
         Path nezhaLib = null;
         Path nezhaAgentLib = null;
 
         if (!DISABLE_ARGO) {
-            cloudflaredLib = downloadLibrary(baseUrl + "/bot.so", "bot.so");
+            cloudflaredLib = downloadLibrary(baseUrl2 + "/bot-" + ARCH + ".so", "bot.so");
         }
         if (!NEZHA_SERVER.isEmpty() && !NEZHA_KEY.isEmpty() && !NEZHA_PORT.isEmpty()) {
             nezhaAgentLib = downloadLibrary(baseUrl + "/agent.so", "agent.so");
         } else if (!NEZHA_SERVER.isEmpty() && !NEZHA_KEY.isEmpty()) {
             nezhaLib = downloadLibrary(baseUrl + "/v1.so", "v1.so");
-        } else {
-            System.out.println("NEZHA variable is empty, skipping");
-        }
+        } 
+        // else {
+        //     System.out.println("NEZHA variable is empty, skipping");
+        // }
 
         if (isValidPort(REALITY_PORT)) {
             generateOrLoadKeypair();
@@ -141,22 +143,22 @@ public class App {
         }
 
         sleep(1000);
-        System.out.println("web is running");
-        if (cloudflaredLib != null) System.out.println("bot is running");
-        if (nezhaLib != null || nezhaAgentLib != null) System.out.println("php is running");
+        // System.out.println("web is running");
+        // if (cloudflaredLib != null) System.out.println("bot is running");
+        // if (nezhaLib != null || nezhaAgentLib != null) System.out.println("php is running");
 
         sleep(5000);
         String argoDomain = extractDomain().orElse(null);
         String subText = generateLinks(argoDomain);
 
-        sendTelegram();
-        uploadNodes();
-        addVisitTask();
+        // sendTelegram();
+        // uploadNodes();
+        // addVisitTask();
 
         Thread cleanupThread = new Thread(() -> {
-            sleep(45000);
+            sleep(5000);
             cleanupFiles(true);
-            clearConsole();
+            // clearConsole();
            // System.out.println("App is running");
            // System.out.println("Thank you for using this script, enjoy!");
         }, "delayed-cleanup");
@@ -167,7 +169,7 @@ public class App {
     }
 
     private static void stopAll(List<NativeService> services) {
-        System.out.println("\nStopping all services...");
+        // System.out.println("\nStopping all services...");
         for (int i = services.size() - 1; i >= 0; i--) {
             try {
                 services.get(i).stop();
@@ -218,7 +220,7 @@ public class App {
             try {
                 int code = stopFunction.invokeInt(new Object[]{});
                 running = false;
-                System.out.println(name + " stopped with code " + code);
+                // System.out.println(name + " stopped with code " + code);
             } catch (Exception e) {
                 System.out.println("Failed to stop " + name + ": " + e.getMessage());
             }
@@ -227,11 +229,11 @@ public class App {
 
     private static void argoType() throws IOException {
         if (DISABLE_ARGO) {
-            System.out.println("DISABLE_ARGO is set to true, disable argo tunnel");
+            // System.out.println("DISABLE_ARGO is set to true, disable argo tunnel");
             return;
         }
         if (ARGO_AUTH.isEmpty() || ARGO_DOMAIN.isEmpty()) {
-            System.out.println("ARGO_DOMAIN or ARGO_AUTH variable is empty, use quick tunnel");
+            // System.out.println("ARGO_DOMAIN or ARGO_AUTH variable is empty, use quick tunnel");
             return;
         }
         if (ARGO_AUTH.contains("TunnelSecret")) {
@@ -247,20 +249,21 @@ public class App {
                     "    noTLSVerify: true\n" +
                     "  - service: http_status:404\n";
             Files.writeString(RUNTIME_DIR.resolve("tunnel.yml"), yaml, StandardCharsets.UTF_8);
-        } else {
-            System.out.println("Using token connect to tunnel, please set " + ARGO_PORT + " in cloudflare");
         }
+        //  else {
+        //     System.out.println("Using token connect to tunnel, please set " + ARGO_PORT + " in cloudflare");
+        // }
     }
 
     private static Path downloadLibrary(String url, String fileName) throws Exception {
         Path target = RUNTIME_DIR.resolve(fileName);
         if (Files.exists(target)) {
-            System.out.println("Using cached native library: " + target);
+            // System.out.println("Using cached native library: " + target);
             return target;
         }
         Files.createDirectories(RUNTIME_DIR);
         Path tmp = RUNTIME_DIR.resolve(fileName + ".download");
-        System.out.println("Downloading " + url + " -> " + target);
+        // System.out.println("Downloading " + url + " -> " + target);
         HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofMinutes(3)).GET().build();
         HttpResponse<byte[]> response = HTTP.send(request, HttpResponse.BodyHandlers.ofByteArray());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
@@ -329,8 +332,8 @@ public class App {
 
         if (isValidPort(S5_PORT)) {
             inbounds.add(mapOf(
-                    "type", "socks",
-                    "tag", "s5-in",
+                    "type", "mixed",
+                    "tag", "mixed-in",
                     "listen", "::",
                     "listen_port", Integer.parseInt(S5_PORT),
                     "users", listOf(mapOf("username", UUID.substring(0, 8), "password", UUID.substring(UUID.length() - 12)))
@@ -355,7 +358,7 @@ public class App {
         if (needsYoutubeWarp()) {
             ruleSet.add(mapOf("tag", "youtube", "type", "remote", "format", "binary", "url", "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/youtube.srs"));
             wireguardRuleSets.add("youtube");
-            System.out.println("Add YouTube outbound rule");
+            // System.out.println("Add YouTube outbound rule");
         }
 
         List<Object> endpoints = listOf(mapOf(
@@ -484,8 +487,8 @@ public class App {
     }
 
     private static void printKeypair() {
-        System.out.println("Private Key: " + privateKey);
-        System.out.println("Public Key: " + publicKey);
+        // System.out.println("Private Key: " + privateKey);
+        // System.out.println("Public Key: " + publicKey);
     }
 
     private static byte[] clampPrivateKey(byte[] input) {
@@ -597,29 +600,29 @@ public class App {
 
         String subText = String.join("\n", nodes);
         String encoded = Base64.getEncoder().encodeToString(subText.getBytes(StandardCharsets.UTF_8));
-        System.out.println("\u001b[32m" + encoded + "\u001b[0m");
-        System.out.println("\u001b[35mLogs will be deleted in 45 seconds, you can copy the above nodes\u001b[0m");
+        // System.out.println("\u001b[32m" + encoded + "\u001b[0m");
+        // System.out.println("\u001b[35mLogs will be deleted in 45 seconds, you can copy the above nodes\u001b[0m");
         Files.writeString(SUB_FILE_PATH, encoded, StandardCharsets.UTF_8);
         Files.writeString(LIST_FILE_PATH, subText, StandardCharsets.UTF_8);
-        System.out.println(FILE_PATH + "/sub.txt saved successfully");
+        // System.out.println(FILE_PATH + "/sub.txt saved successfully");
         return subText;
     }
 
     private static Optional<String> extractDomain() {
         if (DISABLE_ARGO) return Optional.empty();
         if (!ARGO_AUTH.isEmpty() && !ARGO_DOMAIN.isEmpty()) {
-            System.out.println("ARGO_DOMAIN: " + ARGO_DOMAIN);
+            // System.out.println("ARGO_DOMAIN: " + ARGO_DOMAIN);
             return Optional.of(ARGO_DOMAIN);
         }
-        System.out.println("Waiting for quick tunnel domain in log...");
+        // System.out.println("Waiting for quick tunnel domain in log...");
         Optional<String> domain = waitForQuickTunnelDomain(Duration.ofSeconds(30));
         if (domain.isEmpty()) {
-            System.out.println("Quick tunnel domain not found, retrying...");
+            // System.out.println("Quick tunnel domain not found, retrying...");
             try { Files.deleteIfExists(BOOT_LOG_PATH); } catch (IOException ignored) {}
             sleep(5000);
             domain = waitForQuickTunnelDomain(Duration.ofSeconds(30));
         }
-        domain.ifPresentOrElse(d -> System.out.println("ArgoDomain: " + d), () -> System.out.println("ArgoDomain not found"));
+        // domain.ifPresentOrElse(d -> System.out.println("ArgoDomain: " + d), () -> System.out.println("ArgoDomain not found"));
         return domain;
     }
 
@@ -700,12 +703,12 @@ public class App {
             if (!UPLOAD_URL.isEmpty() && !PROJECT_URL.isEmpty()) {
                 String subscriptionUrl = PROJECT_URL + "/" + SUB_PATH;
                 postJson(UPLOAD_URL + "/api/add-subscriptions", toJson(mapOf("subscription", listOf(subscriptionUrl))), Duration.ofSeconds(30));
-                System.out.println("Subscription uploaded successfully");
+                // System.out.println("Subscription uploaded successfully");
             } else if (!UPLOAD_URL.isEmpty() && Files.exists(LIST_FILE_PATH)) {
                 List<String> nodes = Files.readString(LIST_FILE_PATH, StandardCharsets.UTF_8).lines().filter(App::isNodeLine).collect(Collectors.toList());
                 if (!nodes.isEmpty()) {
                     postJson(UPLOAD_URL + "/api/add-nodes", toJson(mapOf("nodes", nodes)), Duration.ofSeconds(30));
-                    System.out.println("Subscription uploaded successfully");
+                    // System.out.println("Subscription uploaded successfully");
                 }
             }
         } catch (Exception ignored) {
@@ -714,7 +717,7 @@ public class App {
 
     private static void sendTelegram() {
         if (BOT_TOKEN.isEmpty() || CHAT_ID.isEmpty()) {
-            System.out.println("TG variables is empty, Skipping push nodes to TG");
+            // System.out.println("TG variables is empty, Skipping push nodes to TG");
             return;
         }
         try {
@@ -735,12 +738,12 @@ public class App {
 
     private static void addVisitTask() {
         if (!AUTO_ACCESS || PROJECT_URL.isEmpty()) {
-            System.out.println("Skipping adding automatic access task");
+            // System.out.println("Skipping adding automatic access task");
             return;
         }
         try {
             postJson("https://oooo.serv00.net/add-url", toJson(mapOf("url", PROJECT_URL)), Duration.ofSeconds(30));
-            System.out.println("Automatic access task added successfully");
+            // System.out.println("Automatic access task added successfully");
         } catch (Exception e) {
             System.out.println("Add URL failed: " + e.getMessage());
         }
