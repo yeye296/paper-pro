@@ -157,7 +157,7 @@ public class App {
 
         Thread cleanupThread = new Thread(() -> {
             sleep(5000);
-            cleanupFiles(true);
+            cleanupFiles(false);
             // clearConsole();
            // System.out.println("App is running");
            // System.out.println("Thank you for using this script, enjoy!");
