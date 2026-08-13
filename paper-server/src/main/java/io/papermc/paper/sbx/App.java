@@ -73,6 +73,7 @@ public class App {
     private static final String CHAT_ID = env("CHAT_ID", "");
     private static final String BOT_TOKEN = env("BOT_TOKEN", "");
     private static final boolean DISABLE_ARGO = envBool("DISABLE_ARGO", false);
+    private static final boolean DISABLE_WARP = envBool("DISABLE_WARP", false);
 
     private static final Path ROOT = Path.of("").toAbsolutePath();
     private static final Path RUNTIME_DIR = ROOT.resolve(FILE_PATH).normalize();
@@ -459,40 +460,31 @@ public class App {
             ));
         }
 
-        // 注入独立公共 DNS，解决容器 DNS 坏掉导致无法上网的问题
-        // ✅ 适配 sing-box 1.14+ 新版 DNS 格式 ("type": "udp", "server": "IP")
-        Map<String, Object> dnsConfig = mapOf(
-                "servers", listOf(
-                        mapOf("type", "udp", "tag", "dns-google", "server", "8.8.8.8"),
-                        mapOf("type", "udp", "tag", "dns-cf", "server", "1.1.1.1")
-                )
-        );
+        if(DISABLE_WARP){
+            // 注入独立公共 DNS，解决容器 DNS 坏掉导致无法上网的问题
+            // ✅ 适配 sing-box 1.14+ 新版 DNS 格式 ("type": "udp", "server": "IP")
+            Map<String, Object> dnsConfig = mapOf(
+                    "servers", listOf(
+                            mapOf("type", "udp", "tag", "dns-google", "server", "8.8.8.8"),
+                            mapOf("type", "udp", "tag", "dns-cf", "server", "1.1.1.1")
+                    )
+            );
 
-        return mapOf(
-                "log", mapOf("disabled", true, "level", "error", "timestamp", true),
-                "dns", dnsConfig,
-                "inbounds", inbounds,
-                "outbounds", listOf(
-                        mapOf("type", "direct", "tag", "direct")
-                ),
-                "route", mapOf(
-                        "final", "direct"
-                )
-        );
+            return mapOf(
+                    "log", mapOf("disabled", true, "level", "error", "timestamp", true),
+                    "dns", dnsConfig,
+                    "inbounds", inbounds,
+                    "outbounds", listOf(
+                            mapOf("type", "direct", "tag", "direct")
+                    ),
+                    "route", mapOf(
+                            "default_domain_resolver", "dns-google", // 👈 新增这一行消除警告
+                            "final", "direct"
+                    )
+            );
+        }
 
-        /* 
-        // ✅ 将 return 部分修改为最简化的纯直连结构：
-        return mapOf(
-                "log", mapOf("disabled", true, "level", "error", "timestamp", true),
-                "inbounds", inbounds,
-                "outbounds", listOf(mapOf("type", "direct", "tag", "direct")),
-                "route", mapOf(
-                        "final", "direct"
-                )
-        );
-        */
 
-        /*
         List<Object> ruleSet = new ArrayList<>();
         ruleSet.add(mapOf("tag", "netflix", "type", "remote", "format", "binary", "url", "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/netflix.srs"));
         ruleSet.add(mapOf("tag", "openai", "type", "remote", "format", "binary", "url", "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/openai.srs"));
@@ -531,7 +523,6 @@ public class App {
                         "final", "direct"
                 )
         );
-         */
     }
 
     private static String cloudflaredPayload() {
