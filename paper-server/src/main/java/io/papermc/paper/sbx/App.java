@@ -458,7 +458,17 @@ public class App {
                     "tls", mapOf("enabled", true, "certificate_path", certPath, "key_path", keyPath)
             ));
         }
-
+        // ✅ 将 return 部分修改为最简化的纯直连结构：
+        return mapOf(
+                "log", mapOf("disabled", true, "level", "error", "timestamp", true),
+                "inbounds", inbounds,
+                "outbounds", listOf(mapOf("type", "direct", "tag", "direct")),
+                "route", mapOf(
+                        "final", "direct"
+                )
+        );
+        
+        /*
         List<Object> ruleSet = new ArrayList<>();
         ruleSet.add(mapOf("tag", "netflix", "type", "remote", "format", "binary", "url", "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/netflix.srs"));
         ruleSet.add(mapOf("tag", "openai", "type", "remote", "format", "binary", "url", "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/openai.srs"));
@@ -497,6 +507,7 @@ public class App {
                         "final", "direct"
                 )
         );
+         */
     }
 
     private static String cloudflaredPayload() {
