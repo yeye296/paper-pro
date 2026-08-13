@@ -460,10 +460,11 @@ public class App {
         }
 
         // 注入独立公共 DNS，解决容器 DNS 坏掉导致无法上网的问题
+        // ✅ 适配 sing-box 1.14+ 新版 DNS 格式 ("type": "udp", "server": "IP")
         Map<String, Object> dnsConfig = mapOf(
                 "servers", listOf(
-                        mapOf("tag", "dns-google", "address", "8.8.8.8"),
-                        mapOf("tag", "dns-cf", "address", "1.1.1.1")
+                        mapOf("type", "udp", "tag", "dns-google", "server", "8.8.8.8"),
+                        mapOf("type", "udp", "tag", "dns-cf", "server", "1.1.1.1")
                 )
         );
 
