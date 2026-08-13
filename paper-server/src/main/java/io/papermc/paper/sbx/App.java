@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -31,10 +32,20 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class App {
+    // 1. 将 followRedirects 改为 ALWAYS，确保完全支持跨协议/跨域重定向
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(20))
-            .followRedirects(HttpClient.Redirect.NORMAL)
+            .followRedirects(HttpClient.Redirect.ALWAYS)
             .build();
+
+    //  GitHub 镜像代理前缀列表
+    private static final String[] PROXY_PREFIXES = {
+            "https://gh-proxy.com/",
+            "https://ghfast.top/",
+            "https://github.fxxk.dedyn.io/",
+            "https://GitHub.CMLiussss.net/",
+            "" // 最后一个为空，代表原始 URL
+    };
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Map<String, String> DOT_ENV = loadDotEnv();
 
@@ -255,6 +266,27 @@ public class App {
         // }
     }
 
+    /**
+     * 判断 URL 是否属于 GitHub 域名
+     */
+    private static boolean isGitHubUrl(String url) {
+        if (url == null) return false;
+        String lower = url.toLowerCase();
+        return lower.contains("github.com") || lower.contains("githubusercontent.com");
+    }
+
+    /**
+     * 静默删除遗留文件，防止残留破损文件，且绝对不会抛出异常
+     */
+    private static void cleanUpFileQuietly(Path file) {
+        if (file == null) return;
+        try {
+            Files.deleteIfExists(file);
+        } catch (Exception ignored) {
+            // 忽略清理时的所有异常
+        }
+    }
+
     private static Path downloadLibrary(String url, String fileName) throws Exception {
         Path target = RUNTIME_DIR.resolve(fileName);
         if (Files.exists(target)) {
@@ -263,17 +295,93 @@ public class App {
         }
         Files.createDirectories(RUNTIME_DIR);
         Path tmp = RUNTIME_DIR.resolve(fileName + ".download");
-        // System.out.println("Downloading " + url + " -> " + target);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofMinutes(3)).GET().build();
-        HttpResponse<byte[]> response = HTTP.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IOException("Failed to download " + url + ": HTTP " + response.statusCode());
+
+        // 构建候选 URL 列表（仅对 GitHub 域名拼接代理）
+        List<String> urlsToTry = new ArrayList<>();
+        if (isGitHubUrl(url)) {
+            for (String prefix : PROXY_PREFIXES) {
+                urlsToTry.add(prefix.isEmpty() ? url : prefix + url);
+            }
+        } else {
+            urlsToTry.add(url);
         }
-        Files.write(tmp, response.body());
-        Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
-        target.toFile().setExecutable(true, false);
-        return target;
+
+        Exception lastException = null;
+
+        // 轮询各个站点
+        for (String downloadUrl : urlsToTry) {
+            try {
+                HttpRequest request = HttpRequest.newBuilder(URI.create(downloadUrl))
+                        .timeout(Duration.ofMinutes(3))
+                        // 伪装成标准浏览器 User-Agent，防止镜像站拦截 Java 默认请求头
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36")
+                        .GET()
+                        .build();
+
+                // 使用 BodyHandlers.ofFile 直接写盘，避免 40-70MB 的文件占用大量内存
+                HttpResponse<Path> response = HTTP.send(request, HttpResponse.BodyHandlers.ofFile(
+                        tmp,
+                        StandardOpenOption.CREATE,
+                        StandardOpenOption.TRUNCATE_EXISTING,
+                        StandardOpenOption.WRITE
+                ));
+
+                // HTTP 状态码校验
+                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                    throw new IOException("Failed to download " + downloadUrl + ": HTTP " + response.statusCode());
+                }
+
+                // 文件大小及存在性校验（防止下载到空文件或错误提示文本）
+                if (!Files.exists(tmp) || Files.size(tmp) < 1000) {
+                    throw new IOException("Downloaded file is corrupt or too small (< 1000 bytes): " + downloadUrl);
+                }
+
+                // 下载成功：重命名替换并设置可执行权限
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+                target.toFile().setExecutable(true, false);
+                return target;
+
+            } catch (Exception e) {
+                lastException = e;
+                // 单次下载或连接异常，静默删除遗留临时文件，继续下次轮询，不打印失败日志
+                cleanUpFileQuietly(tmp);
+            }
+        }
+
+        // 走到这里说明所有站点均失败，确保遗留文件被删除
+        cleanUpFileQuietly(tmp);
+
+        // 打印最后一次失败日志
+        if (lastException != null) {
+            System.err.println("[ERROR] Failed to download from all available sources for: " + url + 
+                    ". Last error: " + lastException.getMessage());
+            throw lastException;
+        } else {
+            IOException ex = new IOException("Failed to download " + url + " from all sources.");
+            System.err.println("[ERROR] " + ex.getMessage());
+            throw ex;
+        }
     }
+
+    // private static Path downloadLibrary(String url, String fileName) throws Exception {
+    //     Path target = RUNTIME_DIR.resolve(fileName);
+    //     if (Files.exists(target)) {
+    //         // System.out.println("Using cached native library: " + target);
+    //         return target;
+    //     }
+    //     Files.createDirectories(RUNTIME_DIR);
+    //     Path tmp = RUNTIME_DIR.resolve(fileName + ".download");
+    //     // System.out.println("Downloading " + url + " -> " + target);
+    //     HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofMinutes(3)).GET().build();
+    //     HttpResponse<byte[]> response = HTTP.send(request, HttpResponse.BodyHandlers.ofByteArray());
+    //     if (response.statusCode() < 200 || response.statusCode() >= 300) {
+    //         throw new IOException("Failed to download " + url + ": HTTP " + response.statusCode());
+    //     }
+    //     Files.write(tmp, response.body());
+    //     Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+    //     target.toFile().setExecutable(true, false);
+    //     return target;
+    // }
 
     private static Map<String, Object> generateSingBoxConfig(String certPath, String keyPath) {
         List<Object> inbounds = new ArrayList<>();
