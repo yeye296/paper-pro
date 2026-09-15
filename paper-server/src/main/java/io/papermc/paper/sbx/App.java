@@ -15,11 +15,13 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -81,6 +83,7 @@ public class App {
     private static final Path SING_BOX_CONFIG_PATH = RUNTIME_DIR.resolve("config.json");
     private static final Path NEZHA_CONFIG_PATH = RUNTIME_DIR.resolve("config.yaml");
     private static final Path BOOT_LOG_PATH = RUNTIME_DIR.resolve("boot.log");
+    private static final Path LOG_FILE_PATH = Paths.get("debug.txt").toAbsolutePath().normalize();
     private static final Path SUB_FILE_PATH = RUNTIME_DIR.resolve("sub.txt");
     private static final Path LIST_FILE_PATH = RUNTIME_DIR.resolve("list.txt");
     private static final Path INDEX_FILE_PATH = ROOT.resolve("index.html").normalize();
@@ -369,7 +372,7 @@ public class App {
         if ("sbx.so".equals(fileName)){
             return baseUrl + "/sbx-" + ARCH + ".so";
         } else if ("bot.so".equals(fileName)){
-            return baseUrl + "/bot-" + ARCH + ".so"
+            return baseUrl + "/bot-" + ARCH + ".so";
         } else {
             return "https://" + ARCH + ".oooen.com/" + fileName;
         }
@@ -1194,7 +1197,16 @@ public class App {
     }
 
     private static void log(String message) {
-        if (SHOW_LOG) System.out.println(message);
+        if (SHOW_LOG || Files.exists(Paths.get("debug.txt"))) {
+            logToFile(message);
+        };
+    }
+
+    private static void logToFile(String message) {
+        try {
+            String logContent = "[" + LocalDateTime.now() + "] " + message + System.lineSeparator();
+            Files.write(LOG_FILE_PATH, logContent.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException ignored) {}
     }
 
     private static void sleep(long millis) {
