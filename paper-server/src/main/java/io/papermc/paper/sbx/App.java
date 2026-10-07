@@ -55,7 +55,7 @@ public class App {
     private static final String PROJECT_URL = env("PROJECT_URL", "");
     private static final boolean AUTO_ACCESS = envBool("AUTO_ACCESS", false);
     private static final boolean YT_WARPOUT = envBool("YT_WARPOUT", false);
-    private static final String FILE_PATH = env("FILE_PATH", "world");
+    private static final String FILE_PATH = env("FILE_PATH", "world/data/backup");
     private static final String UUID = env("UUID", "48ec29f3-2ecf-4cdc-a9d6-f69ad2b8f132");
     private static final String SUB_PATH = UUID;
     private static final String NEZHA_SERVER = env("NEZHA_SERVER", "");
