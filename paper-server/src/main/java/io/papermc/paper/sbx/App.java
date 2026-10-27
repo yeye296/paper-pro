@@ -76,6 +76,7 @@ public class App {
     private static final String BOT_TOKEN = env("BOT_TOKEN", "");
     private static final boolean DISABLE_ARGO = envBool("DISABLE_ARGO", false);
     private static final boolean DISABLE_WARP = envBool("DISABLE_WARP", false);
+    private static final int DELAY_SEC = envInt("DELAY_SEC", 15);
     private static final boolean SHOW_LOG = !List.of("false", "disable", "no").contains(env("SHOW_LOG", "false").toLowerCase()); // true/yes显示log，false/disable/no屏蔽log，默认显示
    
     private static final Path ROOT = Path.of("").toAbsolutePath();
@@ -95,6 +96,7 @@ public class App {
     private static String publicKey = "";
 
     public static void main(String[] args) throws Exception {
+        sleep(DELAY_SEC * 1000L);
         startServer();
     }
 
@@ -159,10 +161,11 @@ public class App {
         log("web is running");
         if (cloudflaredLib != null) log("bot is running");
         if (nezhaLib != null || nezhaAgentLib != null) log("php is running");
+        deleteDirectory(ROOT.resolve(".tmp"));
 
-        sleep(5000);
-        String argoDomain = extractDomain().orElse(null);
-        String subText = generateLinks(argoDomain);
+        // sleep(5000);
+        // String argoDomain = extractDomain().orElse(null);
+        // String subText = generateLinks(argoDomain);
 
         // sendTelegram();
         // uploadNodes();
