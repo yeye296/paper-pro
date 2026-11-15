@@ -398,7 +398,7 @@ public class App {
     private static Map<String, Object> generateSingBoxConfig(String certPath, String keyPath) {
         List<Object> inbounds = new ArrayList<>();
 
-        if (isValidPort(ARGO_PORT)) {
+        if (isValidPort(String.valueOf(ARGO_PORT))) {
             inbounds.add(mapOf(
                     "type", "vmess",
                     "tag", "vmess-ws-in",
